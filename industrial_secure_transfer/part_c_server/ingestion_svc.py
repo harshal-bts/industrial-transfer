@@ -196,6 +196,7 @@ class IngestionServerService:
         # Deduplication index loaded from journal: transferId -> (senderId, manifestHash, receipt_doc)
         self._committed_dedup: Dict[str, Tuple[str, str, Dict[str, Any]]] = {}
         self._quarantined_transfers: Set[str] = set()
+        self._quarantined_attempts: Dict[Tuple[str, str], str] = {}
         self._rebuild_dedup_index()
 
     @property
@@ -214,6 +215,7 @@ class IngestionServerService:
                     self._committed_dedup[t_id] = (s_id, m_hash, r_doc)
                 elif ev == "SERVER_TRANSFER_QUARANTINED":
                     self._quarantined_transfers.add(rec.transfer_id)
+                    self._quarantined_attempts[(rec.transfer_id, rec.attempt_id)] = str(rec.payload.get("reason", "Quarantined"))
 
     def scan_and_reconcile_incoming(self) -> List[IngestionOutcome]:
         """
@@ -265,6 +267,22 @@ class IngestionServerService:
 
         sender_id = str(outer_manifest.get("senderId", "UNKNOWN"))
         manifest_hash = compute_manifest_digest(outer_manifest)
+
+        # Skip already-quarantined (transfer_id, attempt_id) so daemon loop doesn't spin
+        if (transfer_id, attempt_id) in self._quarantined_attempts:
+            return IngestionOutcome(
+                transfer_id=transfer_id,
+                attempt_id=attempt_id,
+                sender_id=sender_id,
+                manifest_hash=manifest_hash,
+                status="QUARANTINED",
+                commit_id=None,
+                files_verified=0,
+                total_bytes=0,
+                receipt_document=None,
+                receipt_path=None,
+                failure_reason=self._quarantined_attempts[(transfer_id, attempt_id)],
+            )
 
         # SRV-03 Idempotency / Deduplication check
         if transfer_id in self._committed_dedup:
@@ -605,6 +623,7 @@ class IngestionServerService:
             },
         )
         self._quarantined_transfers.add(transfer_id)
+        self._quarantined_attempts[(transfer_id, attempt_id)] = reason
 
         return IngestionOutcome(
             transfer_id=transfer_id,

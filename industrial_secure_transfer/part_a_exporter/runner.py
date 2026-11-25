@@ -681,8 +681,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         return runner.run_ui_preflight(job)
 
     def _worker_fn(session_id: str, job: JobConfig, ctrl: OperatorUIController) -> PartAExportOutcome:
-        t_id = ctrl.vm.transfer_id or generate_immutable_attempt_id("TR")
-        att_id = ctrl.vm.attempt_id or generate_immutable_attempt_id("ATT")
+        from industrial_secure_transfer.core.state import TransferState
+        is_resuming = ctrl.vm.transfer_state in (TransferState.PAUSED, TransferState.STOPPED)
+        t_id = ctrl.vm.transfer_id if (is_resuming and ctrl.vm.transfer_id) else generate_immutable_attempt_id("TR")
+        att_id = ctrl.vm.attempt_id if (is_resuming and ctrl.vm.attempt_id) else generate_immutable_attempt_id("ATT")
         ctrl.post_worker_event("JOB_META", {"transfer_id": t_id, "attempt_id": att_id})
         return runner.execute_export(
             session_id,

@@ -1004,19 +1004,29 @@ class OperatorUIController:
             )
 
         if scr == UIScreenId.SCR_18_BLOCKED_FAILURE:
+            is_smb_err = "SMB" in (vm.error_code or "").upper() or "SMB" in (vm.error_detail or "").upper()
+            title_txt = "Transfer blocked — SMB check failed" if is_smb_err else "Transfer blocked — USB check failed"
+            sub_txt = (
+                f"{m_id}  |  Approved SMB Share  |  Error {vm.error_code or 'SMB-ERR-001'}"
+                if is_smb_err
+                else f"{m_id}  |  USB-003  |  Error {vm.error_code or 'USB-HASH-001'}"
+            )
+            row1_lbl = "Network / SMB" if is_smb_err else "Device identity"
+            row1_val = "SMB 3.1.1 Policy Gate" if is_smb_err else "Approved USB-003"
+            row2_lbl = "Failure reason" if is_smb_err else "Sample read-back"
             return ScreenRenderSpec(
                 screen_id=scr,
-                title="Transfer blocked — USB check failed",
-                subtitle=f"{m_id}  |  USB-003  |  Error {vm.error_code or 'USB-HASH-001'}",
+                title=title_txt,
+                subtitle=sub_txt,
                 rows=[
-                    ("Device identity", "Approved USB-003", COLOR_SUCCESS_GREEN),
-                    ("Sample read-back", vm.error_detail or "SHA-256 mismatch", COLOR_DANGER_RED),
+                    (row1_lbl, row1_val, COLOR_TITLE_DARK),
+                    (row2_lbl, vm.error_detail or "Mandatory check failed", COLOR_DANGER_RED),
                     ("Transfer status", "BLOCKED • no dataset copied", COLOR_DANGER_RED),
                     ("Local files", "Unchanged", COLOR_SUCCESS_GREEN),
                 ],
                 sidebar_title="What to do",
                 sidebar_paragraphs=[
-                    "Do not format, repair or use another unapproved USB.",
+                    "Verify TCP 445 connectivity and SMB 3.1.1 encryption." if is_smb_err else "Do not format, repair or use another unapproved USB.",
                     "Contact IT/OT with the error and transfer ID.",
                     "Retry only after the issue is resolved.",
                 ],
@@ -1463,6 +1473,7 @@ class IndustrialTransferDesktopApp:
                     fill=val_col,
                     font=("Segoe UI", 11, "bold"),
                     anchor="w",
+                    width=(lx2 - lx1 - 310),
                     tags=(row_tag,),
                 )
                 if spec.screen_id == UIScreenId.SCR_02_JOB_SELECTION and idx < len(self.controller.vm.available_jobs) and self._preview_override is None:
@@ -1561,47 +1572,55 @@ class IndustrialTransferDesktopApp:
         self._preview_override = None
         self._screen_combo_var.set("Live Workflow Mode (Auto)")
 
-        if action_key == "SIGN_IN":
-            ok = self.controller.sign_in(self._user_entry.get(), self._pass_entry.get())
-            self._pass_entry.delete(0, self._tk.END)
-            if not ok:
-                self.controller.show_login_error_screen()
-        elif action_key == "BACK_TO_LOGIN":
-            self.controller.vm.screen = UIScreenId.SCR_01_LOGIN
-        elif action_key == "RUN_PREFLIGHT":
-            if self.controller.vm.selected_job is None and self.controller.vm.available_jobs:
-                self.controller.vm.selected_job = self.controller.vm.available_jobs[0]
-            self.controller.run_preflight(auto_start=False)
-        elif action_key == "START_TRANSFER":
-            self.controller.start_transfer_async()
-        elif action_key == "PAUSE":
-            self.controller.request_pause()
-        elif action_key == "RESUME":
-            self.controller.request_resume()
-        elif action_key == "STOP_SAFELY":
-            self.controller.request_stop_safely()
-        elif action_key == "CHECK_STATUS":
-            self.controller.request_status_check()
-        elif action_key == "OPEN_HISTORY":
-            self.controller.open_history_view()
-        elif action_key == "OPEN_DETAIL":
-            if self.controller.vm.history_records:
-                self.controller.inspect_transfer_detail(str(self.controller.vm.history_records[0]["transfer_id"]))
-            else:
-                self.controller.vm.screen = UIScreenId.SCR_20_RECEIPT_DETAIL
-        elif action_key == "OPEN_CLEANUP_REVIEW":
-            self.controller.vm.screen = UIScreenId.SCR_13_USB_CLEANUP_REVIEW
-        elif action_key == "CONFIRM_CLEANUP":
-            self.controller.request_cleanup_execution()
-        elif action_key == "BACK_TO_SELECT":
-            self.controller.vm.screen = UIScreenId.SCR_02_JOB_SELECTION
-        elif action_key == "SIGN_OUT":
-            self.controller.safe_sign_out()
-        elif action_key == "KEEP_WORKING":
-            self.controller.vm.screen = UIScreenId.SCR_04_PROGRESS
-        elif action_key == "CLOSE":
-            self._on_close_window()
-            return
+        try:
+            if action_key == "SIGN_IN":
+                ok = self.controller.sign_in(self._user_entry.get(), self._pass_entry.get())
+                self._pass_entry.delete(0, self._tk.END)
+                if not ok:
+                    self.controller.show_login_error_screen()
+            elif action_key == "BACK_TO_LOGIN":
+                self.controller.vm.screen = UIScreenId.SCR_01_LOGIN
+            elif action_key == "RUN_PREFLIGHT":
+                if self.controller.vm.selected_job is None and self.controller.vm.available_jobs:
+                    self.controller.vm.selected_job = self.controller.vm.available_jobs[0]
+                self.controller.run_preflight(auto_start=False)
+            elif action_key == "START_TRANSFER":
+                self.controller.start_transfer_async()
+            elif action_key == "PAUSE":
+                self.controller.request_pause()
+            elif action_key == "RESUME":
+                self.controller.request_resume()
+            elif action_key == "STOP_SAFELY":
+                self.controller.request_stop_safely()
+            elif action_key == "CHECK_STATUS":
+                self.controller.request_status_check()
+            elif action_key == "OPEN_HISTORY":
+                self.controller.open_history_view()
+            elif action_key == "OPEN_DETAIL":
+                if self.controller.vm.history_records:
+                    self.controller.inspect_transfer_detail(str(self.controller.vm.history_records[0]["transfer_id"]))
+                else:
+                    self.controller.vm.screen = UIScreenId.SCR_20_RECEIPT_DETAIL
+            elif action_key == "OPEN_CLEANUP_REVIEW":
+                self.controller.vm.screen = UIScreenId.SCR_13_USB_CLEANUP_REVIEW
+            elif action_key == "CONFIRM_CLEANUP":
+                self.controller.request_cleanup_execution()
+            elif action_key == "BACK_TO_SELECT":
+                self.controller.vm.screen = UIScreenId.SCR_02_JOB_SELECTION
+            elif action_key == "SIGN_OUT":
+                self.controller.safe_sign_out()
+            elif action_key == "KEEP_WORKING":
+                self.controller.vm.screen = UIScreenId.SCR_04_PROGRESS
+            elif action_key == "CLOSE":
+                self._on_close_window()
+                return
+        except AuthenticationError as exc:
+            self.controller.vm.auth_error_message = str(exc)
+            self.controller.vm.screen = UIScreenId.SCR_22_LOGIN_ERROR
+        except Exception as exc:
+            self.controller.vm.error_code = "SAFETY_GATE_BLOCKED"
+            self.controller.vm.error_detail = str(exc)
+            self.controller.vm.screen = UIScreenId.SCR_18_BLOCKED_FAILURE
 
         self.render_current_screen()
 

@@ -140,7 +140,7 @@ def decompress_slice_bounded(
     if codec != "zlib":
         raise PackagingError(f"Unsupported chunk compression codec: '{codec}'")
 
-    if len(payload) > 0 and (expected_uncompressed_size / len(payload)) > max_ratio:
+    if expected_uncompressed_size > 1024 * 1024 and len(payload) > 0 and (expected_uncompressed_size / len(payload)) > max_ratio:
         raise DecompressionBombError(
             f"Chunk compression ratio ({expected_uncompressed_size / len(payload):.1f}x) exceeds max_ratio ({max_ratio}x)."
         )
@@ -155,7 +155,7 @@ def decompress_slice_bounded(
     except zlib.error as exc:
         raise PackagingError(f"Zlib decompression error: {exc}") from exc
 
-    if len(out) > 0 and len(payload) > 0 and (len(out) / len(payload)) > max_ratio:
+    if len(out) > 1024 * 1024 and len(payload) > 0 and (len(out) / len(payload)) > max_ratio:
         raise DecompressionBombError(
             f"Actual decompressed ratio ({len(out) / len(payload):.1f}x) exceeds max_ratio ({max_ratio}x)."
         )

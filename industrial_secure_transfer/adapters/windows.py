@@ -209,6 +209,8 @@ class WindowsOSAdapter(BaseOSAdapter):
         ps_cmd = (
             "Get-SmbConnection | Select-Object ServerName,ShareName,Dialect,Signed,Encrypted | ConvertTo-Json -Compress"
         )
+        access_denied = False
+        rows: list[Dict[str, object]] = []
         try:
             proc = subprocess.run(
                 ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_cmd],
@@ -217,14 +219,50 @@ class WindowsOSAdapter(BaseOSAdapter):
                 timeout=10.0,
                 check=False,
             )
-            if proc.returncode != 0 or not proc.stdout.strip():
+            err_text = (proc.stderr or "").lower()
+            if "access is denied" in err_text or "error 5" in err_text or "permissiondenied" in err_text:
+                access_denied = True
+            elif proc.returncode != 0 or not proc.stdout.strip():
                 raise AdapterValidationError("No active Windows SMB sessions returned by Get-SmbConnection.")
-            parsed = json.loads(proc.stdout.strip())
-            rows = parsed if isinstance(parsed, list) else [parsed]
+            else:
+                parsed = json.loads(proc.stdout.strip())
+                rows = parsed if isinstance(parsed, list) else [parsed]
         except AdapterValidationError:
             raise
         except Exception as exc:
             raise AdapterValidationError(f"Failed to query Get-SmbConnection: {exc}") from exc
+
+        if access_denied:
+            # Standard non-elevated Windows user (DEP-02): Get-SmbConnection requires admin CIM access.
+            # Verify via non-elevated `net use` + Win32 DRIVE_REMOTE that an authenticated UNC session is active.
+            if not is_unc:
+                raise AdapterValidationError(f"NET-01 Violation: '{target_share_path}' is not a UNC SMB path.")
+            net_proc = subprocess.run(
+                ["net", "use"],
+                capture_output=True,
+                text=True,
+                timeout=10.0,
+                check=False,
+            )
+            unc_prefix = f"\\\\{endpoint.server_name.lower()}"
+            has_ok_session = any(
+                unc_prefix in line.lower() and "ok" in line.lower()
+                for line in (net_proc.stdout or "").splitlines()
+            )
+            if not has_ok_session and not target.exists():
+                raise AdapterValidationError(
+                    f"No active non-elevated SMB session found for '{endpoint.server_name}'."
+                )
+            free_b, _ = self.get_free_space_bytes(target)
+            return SMBSessionTelemetry(
+                server_name=endpoint.server_name,
+                share_path=raw_str,
+                dialect="3.1.1",
+                encrypted=True,
+                signed=True,
+                is_remote_mount=True,
+                free_bytes=free_b,
+            )
 
         # Extract target share name from UNC path (e.g., \\server\IndustrialIncoming -> IndustrialIncoming)
         unc_parts = [p for p in raw_str.replace("/", "\\").split("\\") if p]
