@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "industrial-secure-transfer"
+version = "1.2.0"
+description = "Non-destructive, defense-in-depth Industrial Secure Data Transfer system for OT environments (Part A Exporter, Part B Workstation, Part C Ingestion Server)"
+requires-python = ">=3.10"
+dependencies = [
+    "cryptography>=41.0.0",
+    "argon2-cffi>=23.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pyinstaller>=6.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["industrial_secure_transfer/tests"]
+python_files = ["test_*.py"]

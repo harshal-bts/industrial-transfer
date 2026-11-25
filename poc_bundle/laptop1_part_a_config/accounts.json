@@ -1,0 +1,8 @@
+{
+  "accounts": {
+    "operator.name": {
+      "password_hash": "$argon2id$v=19$m=16384,t=2,p=4$Uqrw+lLuR4EZAj9Qb7GS1Q$xEbakMT4VNO+1g2pQ5i08Wfi2zRw4a/KzbnG4fwbdZc",
+      "role": "OPERATOR"
+    }
+  }
+}

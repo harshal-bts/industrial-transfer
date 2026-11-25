@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "deploymentRole": "industrial-exporter",
+  "sourceDeviceId": "IND-PC-001",
+  "sourceRootWindows": "D:\\IndustrialData",
+  "incomingUNC": "\\\\ingestion01.facility.local\\IndustrialIncoming",
+  "receiptsUNC": "\\\\ingestion01.facility.local\\IndustrialReceipts",
+  "approvedUsbIds": [],
+  "packageTargetMiB": 1024,
+  "chunkMiB": 32,
+  "compression": "auto",
+  "compressionLevel": 1,
+  "maxWorkers": 1,
+  "usbProbeMiB": 32,
+  "preflightTimeoutSeconds": 20,
+  "singlePendingExport": true,
+  "smbDialectMinimum": "3.1.1",
+  "requireSmbEncryption": true,
+  "mode": "incremental",
+  "note": "Illustration only; no destructive policy flags. Production signed configuration and native adapters required."
+}

@@ -1,0 +1,2 @@
+# Tested in this environment with cryptography 46.0.4; review and lock in CI.
+cryptography>=44,<47

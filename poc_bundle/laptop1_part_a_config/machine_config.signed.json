@@ -1,0 +1,37 @@
+{
+  "provisioning_key_id": "PROV-POC-01",
+  "sender_signing_key_id": "SENDER-POC-01",
+  "recipient_encryption_key_id": "SERVER-RSA-01",
+  "recipient_rsa_public_key_pem": "-----BEGIN PUBLIC KEY-----\nMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEA2OB6skmJbc1l/OjnCPJF\nrj52PDiGX2ELQOr3odkZO8UoaXVuzEF0OMzdC7W/V9Arg6OjYjqK2bTxdC58nIGi\ngV9R6+/gyEkvg+nouaA2crKVSOhTKAhfLAVg0BOSiefbGNpKCeYhEfAYmEJynhsG\nNnTLm2vqPmyyEx8hA+CGU4q+ZUbIve4FruBumOwsSZDLjEBaLfk/2nJO3gK3i7Ix\nczQR1KhwGTTUen0cooH+lGjvHFh3xnRugEzo+58V9sbJ8OcbMYaCBqmlCf29nxcr\nBy5OGRukYH4X0iFfynMSjwkKlPbhwYQPQ/GapOmWR0xqESx8Ce8li5JIDQZfQX3V\nFuto3gRSZUc2Ix5fdFNp4EF1/B3xqzi1ftW7TVdxHDt06NNE/bINOfjzWHY8GG33\nqU3/AjAtYbxYItfUeMydorILFVOJNaJNKhqL1HfPFJJqz3PFT0XyTBWd7DylwyQc\nh8Bvv8COCfIdJjsKZsaER9ntmUaIiCTxLT2WfP+tO0AbAgMBAAE=\n-----END PUBLIC KEY-----\n",
+  "trusted_sender_public_keys_pem": {
+    "SENDER-POC-01": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA9Jzyk5qQ+YVZcuGjhKJCb5RtsZPNzcEdNNf6CX61TlE=\n-----END PUBLIC KEY-----\n"
+  },
+  "trusted_server_signing_keys_pem": {
+    "SRV-SIGN-01": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEArzkeWF3tVgVj1H3PHsutfw2aR+M0wfsz5RfbXh/r07k=\n-----END PUBLIC KEY-----\n"
+  },
+  "min_free_space_bytes": 104857600,
+  "authorized_usb_devices": [],
+  "version": 1,
+  "machine_id": "IND-PC-001",
+  "role": "PART_A_EXPORTER",
+  "state_journal_dir": "C:\\IST_POC\\Journal_PartA",
+  "smb_endpoint": {
+    "server_name": "192.168.1.153",
+    "incoming_share_path": "\\\\192.168.1.153\\IndustrialIncoming",
+    "receipt_share_path": "\\\\192.168.1.153\\IndustrialReceipts",
+    "require_smb311": true,
+    "require_encryption": true
+  },
+  "jobs": [
+    {
+      "job_id": "JOB-WIFI-SMB-01",
+      "name": "Direct SMB 3.1.1 Transfer to 192.168.1.153",
+      "source_root": "C:\\IST_POC\\SourceDataset",
+      "transfer_method": "SMB",
+      "discovery_mode": "INCREMENTAL",
+      "stability_window_seconds": 5.0,
+      "chunk_size_bytes": 4194304
+    }
+  ],
+  "signature": "/MsTLS1NnsaO8nPM3DETFdC244+W8YAtU+eSGu6npDfm8anzetHbgyTrWY/9ljndVh9KQ5hFHCYSlOQ3eiGIDg=="
+}

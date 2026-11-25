@@ -1,0 +1,34 @@
+Python 3.13.5
+Linux 46.0.4 Tk 8.6
+test_auth_example (test_reference.ReferenceTests.test_auth_example) ... ok
+test_checkpoint (test_reference.ReferenceTests.test_checkpoint) ... ok
+test_cleanup_disabled (test_reference.ReferenceTests.test_cleanup_disabled) ... ok
+test_copy_retry (test_reference.ReferenceTests.test_copy_retry) ... ok
+test_corrupt_cipher (test_reference.ReferenceTests.test_corrupt_cipher) ... ok
+test_eta (test_reference.ReferenceTests.test_eta) ... ok
+test_immutable_conflict (test_reference.ReferenceTests.test_immutable_conflict) ... ok
+test_invalid_paths (test_reference.ReferenceTests.test_invalid_paths) ... ok
+test_probe (test_reference.ReferenceTests.test_probe) ... ok
+test_roundtrip (test_reference.ReferenceTests.test_roundtrip) ... ok
+test_signature_tamper (test_reference.ReferenceTests.test_signature_tamper) ... ok
+test_stream_zip (test_reference.ReferenceTests.test_stream_zip) ... ok
+test_ui_state (test_reference.ReferenceTests.test_ui_state) ... ok
+test_all_modes (test_workflow.WorkflowTests.test_all_modes) ... ok
+test_direct_network_roundtrip (test_workflow.WorkflowTests.test_direct_network_roundtrip) ... ok
+test_disconnect_during_commit (test_workflow.WorkflowTests.test_disconnect_during_commit) ... ok
+test_failed_precheck (test_workflow.WorkflowTests.test_failed_precheck) ... ok
+test_no_early_cleanup (test_workflow.WorkflowTests.test_no_early_cleanup) ... ok
+test_pause_resume_stop (test_workflow.WorkflowTests.test_pause_resume_stop) ... ok
+test_quarantine_blocks_cleanup (test_workflow.WorkflowTests.test_quarantine_blocks_cleanup) ... ok
+test_read_only_probe (test_workflow.WorkflowTests.test_read_only_probe) ... ok
+test_screen_inventory (test_workflow.WorkflowTests.test_screen_inventory) ... ok
+test_signed_receipt_binding (test_workflow.WorkflowTests.test_signed_receipt_binding) ... ok
+test_symlink_rejected (test_workflow.WorkflowTests.test_symlink_rejected) ... ok
+test_usb_lifecycle (test_workflow.WorkflowTests.test_usb_lifecycle) ... ok
+
+----------------------------------------------------------------------
+Ran 25 tests in 0.714s
+
+OK
+PASS: encryption, manifest signature, forward retry, quarantine validation, overwrite denial. No cleanup performed.
+PASS: Tk UI launch, invalid/valid login, 26 PNG decode, network completion, linked USB export/import/return, history/details, failed preflight, stop/sign-out/re-auth recovery.
