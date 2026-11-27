@@ -415,6 +415,21 @@ class OperatorUIController:
                 self.vm.eta_display = "0s"
                 final_state = getattr(payload, "final_state", TransferState.COMMITTED)
                 self.vm.transfer_state = final_state
+                if hasattr(payload, "transfer_id"):
+                    self.vm.transfer_id = str(payload.transfer_id)
+                if hasattr(payload, "attempt_id"):
+                    self.vm.attempt_id = str(payload.attempt_id)
+                if hasattr(payload, "verified_chunks_count"):
+                    self.vm.verified_chunks_count = int(payload.verified_chunks_count)
+                if hasattr(payload, "verified_bytes"):
+                    self.vm.verified_bytes = int(payload.verified_bytes)
+                if hasattr(payload, "inventory") and payload.inventory is not None:
+                    self.vm.eligible_files_count = int(payload.inventory.file_count)
+                    self.vm.total_bytes = int(payload.inventory.total_bytes)
+                if hasattr(payload, "server_receipt") and payload.server_receipt is not None:
+                    self.vm.commit_id = str(payload.server_receipt.commit_id)
+                    if getattr(payload.server_receipt, "files_verified", 0):
+                        self.vm.eligible_files_count = int(payload.server_receipt.files_verified)
                 if final_state == TransferState.EXPORTED_TO_USB:
                     self.vm.screen = UIScreenId.SCR_09_EXPORTED_TO_USB
                 elif final_state == TransferState.USB_CLEANED:
@@ -1218,61 +1233,27 @@ class IndustrialTransferDesktopApp:
 
     def __init__(self, controller: OperatorUIController) -> None:
         import tkinter as tk
-        from tkinter import ttk
 
         self._tk = tk
-        self._ttk = ttk
         self.controller = controller
         self.root = tk.Tk()
         self.root.title(
             f"SECURE DATA TRANSFER — {controller.vm.role} ({controller.vm.machine_id})"
         )
-        self.root.geometry("1060x540")
-        self.root.minsize(1040, 520)
-        self.root.configure(bg="#e8eef3")
+        self.root.geometry("1060x520")
+        self.root.minsize(780, 460)
+        self.root.configure(bg=COLOR_SURFACE_BG)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close_window)
 
-        self._preview_override: Optional[UIScreenId] = None
-        self._gallery_win: Optional[tk.Toplevel] = None
-        self._gallery_img: Any = None
-
-        # Top quick-navigation bar to preview any of the 26 live screens or open the PNG gallery
-        nav_bar = tk.Frame(self.root, bg="#dce4ec", padx=14, pady=6)
-        nav_bar.pack(fill=tk.X, side=tk.TOP)
-
-        tk.Label(
-            nav_bar,
-            text="Screen View:",
-            bg="#dce4ec",
-            fg=COLOR_TITLE_DARK,
-            font=("Segoe UI", 9, "bold"),
-        ).pack(side=tk.LEFT, padx=(0, 6))
-
-        self._screen_combo_var = tk.StringVar(value="Live Workflow Mode (Auto)")
-        combo_values = ["Live Workflow Mode (Auto)"] + [label for _, label, _ in ALL_26_SCREENS_ORDERED]
-        self._screen_combo = ttk.Combobox(
-            nav_bar,
-            textvariable=self._screen_combo_var,
-            values=combo_values,
-            state="readonly",
-            width=48,
-        )
-        self._screen_combo.pack(side=tk.LEFT, padx=4)
-        self._screen_combo.bind("<<ComboboxSelected>>", self._on_screen_combo_changed)
-
-        gal_btn = ttk.Button(nav_bar, text="Reference PNG Gallery (26)", command=self.open_reference_gallery)
-        gal_btn.pack(side=tk.RIGHT, padx=4)
-
-        # Main 1040x440 Canvas rendering the exact design from the 26 images
+        # Main responsive Canvas rendering the two-card operator UI
         self.canvas = tk.Canvas(
             self.root,
             width=1040,
-            height=440,
+            height=480,
             bg=COLOR_SURFACE_BG,
-            highlightthickness=1,
-            highlightbackground=COLOR_CARD_BORDER,
+            highlightthickness=0,
         )
-        self.canvas.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.canvas.pack(fill=tk.BOTH, expand=True)
 
         # Embedded entry widgets used on SCR-01 Login screen
         self._user_entry = tk.Entry(
@@ -1302,19 +1283,17 @@ class IndustrialTransferDesktopApp:
         )
         self._pass_entry.bind("<Return>", lambda _: self._handle_action("SIGN_IN"))
 
+        self._last_canvas_size: Tuple[int, int] = (0, 0)
+        self.canvas.bind("<Configure>", self._on_canvas_resize)
+
         self.render_current_screen()
         self._schedule_event_pump()
 
-    def _on_screen_combo_changed(self, *_: Any) -> None:
-        sel = self._screen_combo_var.get()
-        if sel == "Live Workflow Mode (Auto)":
-            self._preview_override = None
-        else:
-            for sid, label, _ in ALL_26_SCREENS_ORDERED:
-                if label == sel:
-                    self._preview_override = sid
-                    break
-        self.render_current_screen()
+    def _on_canvas_resize(self, event: Any) -> None:
+        new_size = (int(event.width), int(event.height))
+        if new_size != self._last_canvas_size and new_size[0] >= 300 and new_size[1] >= 250:
+            self._last_canvas_size = new_size
+            self.render_current_screen()
 
     def _draw_rounded_rect(
         self,
@@ -1354,26 +1333,32 @@ class IndustrialTransferDesktopApp:
 
     def render_current_screen(self) -> None:
         """
-        Draws the exact visual layout matching `01_login.png` .. `26_cleaned.png` onto `self.canvas`.
+        Draws the responsive two-card layout matching `01_login.png` .. `26_cleaned.png`
+        onto `self.canvas`, adapting dynamically to the current window width and height.
         """
         c = self.canvas
         c.delete("all")
-        spec = self.controller.build_screen_render_spec(self._preview_override)
+        spec = self.controller.build_screen_render_spec()
 
-        w = 1040
+        cw = c.winfo_width()
+        ch = c.winfo_height()
+        w = float(cw if cw > 200 else 1040)
+        h = float(ch if ch > 200 else 480)
+
         # 1. Top Dark Navy Header Bar (#0f3149, height 54px)
-        c.create_rectangle(0, 0, w, 54, fill=COLOR_HEADER_BG, outline=COLOR_HEADER_BG)
+        header_h = 54.0
+        c.create_rectangle(0, 0, w, header_h, fill=COLOR_HEADER_BG, outline=COLOR_HEADER_BG)
         c.create_text(
             24,
-            27,
+            header_h / 2,
             text="SECURE DATA TRANSFER",
             fill=COLOR_HEADER_FG,
             font=("Segoe UI", 14, "bold"),
             anchor="w",
         )
         c.create_text(
-            w - 80,
-            27,
+            w - 24,
+            header_h / 2,
             text=f"OPERATOR VIEW  /  {spec.screen_id.value.split('_')[0]}",
             fill=COLOR_HEADER_SUB,
             font=("Segoe UI", 10),
@@ -1388,6 +1373,7 @@ class IndustrialTransferDesktopApp:
             fill=COLOR_TITLE_DARK,
             font=("Segoe UI", 21, "bold"),
             anchor="w",
+            width=w - 48,
         )
         c.create_text(
             24,
@@ -1396,15 +1382,27 @@ class IndustrialTransferDesktopApp:
             fill=COLOR_MUTED_LABEL,
             font=("Segoe UI", 11),
             anchor="w",
+            width=w - 48,
         )
 
-        # 3. Left Main Rounded Card (x: 20..702, y: 138..366)
-        lx1, ly1, lx2, ly2 = 20, 138, 702, 366
+        # 3. Responsive Two-Card Geometry
+        margin_x = 20.0
+        gap_x = 16.0
+        card_top = 138.0
+        footer_area_h = 72.0
+        card_bottom = max(card_top + 180.0, h - footer_area_h)
+
+        avail_w = max(600.0, w - (2 * margin_x) - gap_x)
+        left_w = max(400.0, avail_w * 0.675)
+        right_w = max(210.0, avail_w - left_w)
+
+        lx1, ly1, lx2, ly2 = margin_x, card_top, margin_x + left_w, card_bottom
+        rx1, ry1, rx2, ry2 = lx2 + gap_x, card_top, lx2 + gap_x + right_w, card_bottom
+
         self._draw_rounded_rect(lx1, ly1, lx2, ly2, radius=12, fill=COLOR_SURFACE_BG, outline=COLOR_CARD_BORDER)
 
-        row_y = ly1 + 24
+        row_y = ly1 + 26.0
         if spec.show_progress_bar:
-            # Progress Title + Bold Blue Percentage on Right + Rounded Pill Bar
             c.create_text(
                 lx1 + 18,
                 row_y,
@@ -1414,7 +1412,7 @@ class IndustrialTransferDesktopApp:
                 anchor="w",
             )
             c.create_text(
-                lx2 - 36,
+                lx2 - 18,
                 row_y,
                 text=f"{spec.progress_percent:.0f}%",
                 fill=COLOR_PRIMARY_BLUE,
@@ -1434,11 +1432,15 @@ class IndustrialTransferDesktopApp:
                 bar_x1, bar_y1, bar_x1 + fill_w, bar_y2, radius=6,
                 fill=COLOR_PRIMARY_BLUE, outline=COLOR_PRIMARY_BLUE,
             )
-            row_y = bar_y2 + 22
+            row_y = bar_y2 + 24.0
 
-        # Render Table Rows inside Left Card
-        is_live_login = (spec.screen_id == UIScreenId.SCR_01_LOGIN and self._preview_override is None)
-        row_step = 36 if spec.show_progress_bar else 40
+        # Render Table Rows inside Left Card with proportional columns & height
+        is_live_login = (spec.screen_id == UIScreenId.SCR_01_LOGIN)
+        num_rows = max(1, len(spec.rows))
+        avail_rows_h = max(120.0, ly2 - row_y - 10.0)
+        row_step = max(34.0, min(48.0, avail_rows_h / num_rows))
+        val_x = lx1 + max(180.0, (lx2 - lx1) * 0.39)
+        val_wrap_w = max(160.0, lx2 - val_x - 18.0)
 
         for idx, (lbl, val, val_col) in enumerate(spec.rows):
             c.create_text(
@@ -1450,12 +1452,14 @@ class IndustrialTransferDesktopApp:
                 anchor="w",
             )
             if is_live_login and idx == 0:
-                c.create_window(lx1 + 292, row_y, window=self._user_entry, anchor="w")
+                self._user_entry.configure(width=max(16, int(val_wrap_w / 10)))
+                c.create_window(val_x, row_y, window=self._user_entry, anchor="w")
             elif is_live_login and idx == 1:
-                c.create_window(lx1 + 292, row_y, window=self._pass_entry, anchor="w")
+                self._pass_entry.configure(width=max(12, int((val_wrap_w - 70) / 10)))
+                c.create_window(val_x, row_y, window=self._pass_entry, anchor="w")
                 toggle_txt = "[Show]" if self.controller.vm.password_masked else "[Hide]"
                 tid = c.create_text(
-                    lx1 + 480,
+                    min(lx2 - 65, val_x + max(130.0, val_wrap_w - 65.0)),
                     row_y,
                     text=toggle_txt,
                     fill=COLOR_TITLE_DARK,
@@ -1467,29 +1471,28 @@ class IndustrialTransferDesktopApp:
             else:
                 row_tag = f"row_{idx}"
                 c.create_text(
-                    lx1 + 292,
+                    val_x,
                     row_y,
                     text=val,
                     fill=val_col,
                     font=("Segoe UI", 11, "bold"),
                     anchor="w",
-                    width=(lx2 - lx1 - 310),
+                    width=val_wrap_w,
                     tags=(row_tag,),
                 )
-                if spec.screen_id == UIScreenId.SCR_02_JOB_SELECTION and idx < len(self.controller.vm.available_jobs) and self._preview_override is None:
+                if spec.screen_id == UIScreenId.SCR_02_JOB_SELECTION and idx < len(self.controller.vm.available_jobs):
                     job_obj = self.controller.vm.available_jobs[idx]
                     c.tag_bind(row_tag, "<Button-1>", lambda _, j=job_obj: self._on_select_job_row(j))
-                elif spec.screen_id == UIScreenId.SCR_19_HISTORY and idx < len(self.controller.vm.history_records) and self._preview_override is None:
+                elif spec.screen_id == UIScreenId.SCR_19_HISTORY and idx < len(self.controller.vm.history_records):
                     rec_tid = str(self.controller.vm.history_records[idx]["transfer_id"])
                     c.tag_bind(row_tag, "<Button-1>", lambda _, tid=rec_tid: self._on_select_history_row(tid))
 
             if idx < len(spec.rows) - 1:
-                div_y = row_y + (row_step // 2)
+                div_y = row_y + (row_step / 2.0)
                 c.create_line(lx1 + 18, div_y, lx2 - 18, div_y, fill=COLOR_ROW_DIVIDER, width=1)
             row_y += row_step
 
-        # 4. Right Guidance Sidebar Rounded Card (x: 718..1020, y: 138..366)
-        rx1, ry1, rx2, ry2 = 718, 138, 1020, 366
+        # 4. Right Guidance Sidebar Rounded Card
         self._draw_rounded_rect(rx1, ry1, rx2, ry2, radius=12, fill=COLOR_SURFACE_BG, outline=COLOR_CARD_BORDER)
         c.create_text(
             rx1 + 18,
@@ -1508,27 +1511,29 @@ class IndustrialTransferDesktopApp:
                 fill=COLOR_MUTED_LABEL,
                 font=("Segoe UI", 11),
                 anchor="nw",
-                width=(rx2 - rx1 - 36),
+                width=max(140.0, rx2 - rx1 - 36.0),
             )
             bbox = c.bbox(txt_id)
             py = (bbox[3] + 12) if bbox else (py + 38)
 
         # 5. Bottom-Left Safety / Status Note
+        footer_mid_y = card_bottom + 36.0
         if spec.footer_note:
             c.create_text(
                 24,
-                402,
+                footer_mid_y,
                 text=spec.footer_note,
                 fill=spec.footer_color,
                 font=("Segoe UI", 10, "bold"),
                 anchor="w",
+                width=max(240.0, left_w - 20.0),
             )
 
         # 6. Bottom-Right Rounded Action Buttons
-        bx_right = 1020
-        by1, by2 = 384, 422
+        bx_right = w - margin_x
+        by1, by2 = card_bottom + 17.0, card_bottom + 55.0
         for btn_label, btn_style, action_key in reversed(spec.buttons):
-            bw = max(96, len(btn_label) * 9 + 34)
+            bw = max(100.0, len(btn_label) * 9.0 + 34.0)
             bx1 = bx_right - bw
             bx2 = bx_right
             tag_name = f"btn_{action_key}"
@@ -1553,7 +1558,9 @@ class IndustrialTransferDesktopApp:
                 tags=(tag_name,),
             )
             c.tag_bind(tag_name, "<Button-1>", lambda _, ak=action_key: self._handle_action(ak))
-            bx_right = bx1 - 12
+            c.tag_bind(tag_name, "<Enter>", lambda _: c.configure(cursor="hand2"))
+            c.tag_bind(tag_name, "<Leave>", lambda _: c.configure(cursor=""))
+            bx_right = bx1 - 12.0
 
     def _on_select_job_row(self, job: JobConfig) -> None:
         self.controller.vm.selected_job = job
@@ -1569,9 +1576,6 @@ class IndustrialTransferDesktopApp:
         self.render_current_screen()
 
     def _handle_action(self, action_key: str) -> None:
-        self._preview_override = None
-        self._screen_combo_var.set("Live Workflow Mode (Auto)")
-
         try:
             if action_key == "SIGN_IN":
                 ok = self.controller.sign_in(self._user_entry.get(), self._pass_entry.get())
@@ -1623,49 +1627,6 @@ class IndustrialTransferDesktopApp:
             self.controller.vm.screen = UIScreenId.SCR_18_BLOCKED_FAILURE
 
         self.render_current_screen()
-
-    def open_reference_gallery(self) -> None:
-        """
-        Opens a companion window displaying the 26 original PNG design images from
-        `secure_transfer_kit_v1.2/visuals/operator_screens/`.
-        """
-        tk = self._tk
-        ttk = self._ttk
-        if self._gallery_win is not None and self._gallery_win.winfo_exists():
-            self._gallery_win.lift()
-            return
-
-        repo_root = Path(__file__).resolve().parent.parent.parent
-        screens_dir = repo_root / "secure_transfer_kit_v1.2" / "visuals" / "operator_screens"
-
-        w = tk.Toplevel(self.root)
-        self._gallery_win = w
-        w.title("Reference Design Gallery — SCR-01 to SCR-26 (Original PNG Mockups)")
-        w.geometry("1040x540")
-        w.configure(bg=COLOR_SURFACE_BG)
-
-        labels = [f"{lbl}  ({png})" for _, lbl, png in ALL_26_SCREENS_ORDERED]
-        var = tk.StringVar(value=labels[0])
-        box = ttk.Combobox(w, values=labels, textvariable=var, state="readonly", width=62)
-        box.pack(pady=10)
-
-        img_lbl = tk.Label(w, text="", bg=COLOR_SURFACE_BG)
-        img_lbl.pack(fill=tk.BOTH, expand=True)
-
-        def _show_png(*_: Any) -> None:
-            idx = labels.index(var.get())
-            _, _, png_name = ALL_26_SCREENS_ORDERED[idx]
-            png_path = screens_dir / png_name
-            if not png_path.exists():
-                img_lbl.configure(image="", text=f"PNG not found at {png_path}")
-                return
-            im = tk.PhotoImage(file=str(png_path))
-            factor = max(1, (im.width() + 1000 - 1) // 1000, (im.height() + 460 - 1) // 460)
-            self._gallery_img = im.subsample(factor, factor)
-            img_lbl.configure(image=self._gallery_img, text="")
-
-        box.bind("<<ComboboxSelected>>", _show_png)
-        _show_png()
 
     def _schedule_event_pump(self) -> None:
         if self.controller.drain_worker_events() > 0:
